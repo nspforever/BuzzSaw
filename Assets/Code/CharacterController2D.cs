@@ -30,6 +30,7 @@ public class CharacterController2D : MonoBehaviour
     public ControllerParameter2D Parameters { get { return _overrideParameters ?? DefaultParameters; } }
 
     public ControllerParameter2D _overrideParameters;
+    public GameObject StandingOn { get; private set; }
 
 
     public void Awake()
@@ -127,12 +128,6 @@ public class CharacterController2D : MonoBehaviour
 
     private void CalculateRayOrigins()
     {
-        /*var size = new Vector2(_boxCollider.size.x * Mathf.Abs(_localScale.x), _boxCollider.size.y * Mathf.Abs(_localScale.y)) / 2;
-        var center = new Vector2(_boxCollider.offset.x * _localScale.x, _boxCollider.offset.y * _localScale.y);
-
-        _raycastTopLeft = _transform.position + new Vector3(center.x - size.x + SkinWidth, center.y + size.y - SkinWidth);
-        _raycastBottomRight = _transform.position + new Vector3(center.x + size.x - SkinWidth, center.y - size.y + SkinWidth);
-        _raycastBottomLeft = _transform.position + new Vector3(center.x - size.x + SkinWidth, center.y - size.y + SkinWidth);*/
         Bounds bounds = _boxCollider.bounds;
 
         bounds.Expand(SkinWidth * -2);
@@ -159,16 +154,7 @@ public class CharacterController2D : MonoBehaviour
             Debug.DrawRay(rayVector, rayDirection * rayDistance, Color.red);
             Debug.LogFormat("rayVector:{0}, rayDirection:{1}, rayDistance:{2}", rayVector, rayDirection, rayDistance);
 
-
             var rayCastHit = Physics2D.Raycast(rayOrigin, rayDirection, rayDistance, PlatformMask);
-
-
-            //Bounds bounds = _boxCollider.bounds;
-
-            //bounds.Expand(SkinWidth * -2);
-            //_raycastTopLeft = new Vector3(bounds.min.x - SkinWidth, bounds.max.y + SkinWidth);
-            //_raycastBottomRight = new Vector3(bounds.max.x + SkinWidth, bounds.min.y - SkinWidth);
-            //_raycastBottomLeft = new Vector3(bounds.min.x - SkinWidth, bounds.min.y - SkinWidth);
 
             Debug.LogFormat("rayOriginLoop:{0}", rayOrigin);
             Debug.LogFormat("rayCastHit:{0}", rayCastHit.point);
@@ -215,7 +201,72 @@ public class CharacterController2D : MonoBehaviour
 
     private void MoveVertically(ref Vector2 deltaMovement)
     {
+        var isGoingUp = deltaMovement.y > 0;
+        var rayDistance = Mathf.Abs(deltaMovement.y) + SkinWidth;
+        var rayDirection = isGoingUp ? Vector2.up : Vector2.down;
+        var rayOrigin = isGoingUp ? _raycastBottomRight : _raycastBottomLeft;
+        Debug.LogFormat("rayOrigin:{0}", rayOrigin);
+        rayOrigin.x += deltaMovement.x;
+        var standingOnDistance = float.MaxValue;
 
+        for (var i = 0; i < TotalVericalRays; i++)
+        {
+            var rayVector = new Vector2(rayOrigin.x * (i * _horizontalDistanceBetweenRays),  rayOrigin.y);
+            Debug.Log(string.Format("i:{0}", i));
+            Debug.Log(string.Format("deltaMovement.x:{0}", deltaMovement.x));
+            Debug.DrawRay(rayVector, rayDirection * rayDistance, Color.red);
+            Debug.LogFormat("rayVector:{0}, rayDirection:{1}, rayDistance:{2}", rayVector, rayDirection, rayDistance);
+
+            var rayCastHit = Physics2D.Raycast(rayOrigin, rayDirection, rayDistance, PlatformMask);
+
+            Debug.LogFormat("rayOriginLoop:{0}", rayOrigin);
+            Debug.LogFormat("rayCastHit:{0}", rayCastHit.point);
+
+            Debug.Log(PlatformMask.value.ToString());
+
+
+            if (rayCastHit.collider == null || rayCastHit.collider == _boxCollider)
+            {
+                Debug.Log("Continue");
+                continue;
+            }
+
+            if (!isGoingUp)
+            {
+                var verticalDistanceToHit = _transform.position.y - rayCastHit.point.y;
+                if (verticalDistanceToHit < standingOnDistance)
+                {
+                    standingOnDistance = verticalDistanceToHit;
+                    StandingOn = rayCastHit.collider.gameObject;
+                }
+            }
+
+            deltaMovement.y = rayCastHit.point.y - rayVector.y;
+            rayDistance = Mathf.Abs(deltaMovement.y);
+            if (isGoingUp)
+            {
+                deltaMovement.y -= SkinWidth;
+                State.IsCollidingAbove = true;
+            }
+            else
+            {
+                deltaMovement.y += SkinWidth;
+                State.IsCollidingBlow = true;
+            }
+
+            if (!isGoingUp && deltaMovement.y > 0.001f)
+            {
+                State.IsMovingUpSlope = true;
+            }
+
+            if (rayDistance < SkinWidth + .0001f)
+            {
+                Debug.Log(string.Format("rayDistance:{0}", rayDistance));
+                Debug.Log(string.Format("SkinWidth:{0}", SkinWidth));
+
+                break;
+            }
+        }
     }
 
     private bool HandleHorizontalSlope(ref Vector2 deltaMovement, float angle, bool isGoingRight)
@@ -223,9 +274,9 @@ public class CharacterController2D : MonoBehaviour
         return false;
     }
 
-    private void HandleVerticalSlope(ref Vector2 deltaMovement)
+    private bool HandleVerticalSlope(ref Vector2 deltaMovement)
     {
-
+        return false;
     }
 
     public void OnTriggerEnter2D(Collider2D other)

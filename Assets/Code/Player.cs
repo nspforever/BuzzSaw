@@ -55,7 +55,7 @@ public class Player : MonoBehaviour
         {
             _normalizedHorizontalSpeed = 0;
         }
-
+        
         if (_controller.CanJump && Input.GetKey(KeyCode.Space))
         {
             _controller.Jump();
