@@ -25,12 +25,29 @@ public class CharacterController2D : MonoBehaviour
 
     
 
-    public bool CanJump { get { return false; } }
+    public bool CanJump {
+        get
+        {
+            if (Parameters.JumpRestrictions == ControllerParameter2D.JumpBehavior.CanJumpAnywhere)
+            {
+                return _jumpIn <= 0;
+            }
+
+            if (Parameters.JumpRestrictions == ControllerParameter2D.JumpBehavior.CanJumpOnGround)
+            {   
+                return State.IsGrounded;
+            }
+
+            return false;
+        }
+    }
     public bool HandleCollisions { get; set; }
     public ControllerParameter2D Parameters { get { return _overrideParameters ?? DefaultParameters; } }
 
     public ControllerParameter2D _overrideParameters;
     public GameObject StandingOn { get; private set; }
+
+    private float _jumpIn;
 
 
     public void Awake()
@@ -74,12 +91,16 @@ public class CharacterController2D : MonoBehaviour
 
     public void Jump()
     {
-
+        AddForce(new Vector2(0, Parameters.JumpMagnitude));
+        _jumpIn = Parameters.JumpFrequency;
     }
 
     public void LateUpdate()
-    {   
+    {
+        _jumpIn -= Time.deltaTime;
+        _velocity.y += Parameters.Gravity * Time.deltaTime;
         Move(Velocity * Time.deltaTime);
+
     }
 
     private void Move(Vector2 deltaMovement)
@@ -138,8 +159,7 @@ public class CharacterController2D : MonoBehaviour
     }
 
     private void MoveHorizontally(ref Vector2 deltaMovement)
-    {
-        
+    {  
         var isGoingRight = deltaMovement.x > 0;
         var rayDistance = Mathf.Abs(deltaMovement.x) + SkinWidth;
         var rayDirection = isGoingRight ? Vector2.right : -Vector2.right;
@@ -154,7 +174,7 @@ public class CharacterController2D : MonoBehaviour
             Debug.DrawRay(rayVector, rayDirection * rayDistance, Color.red);
             Debug.LogFormat("rayVector:{0}, rayDirection:{1}, rayDistance:{2}", rayVector, rayDirection, rayDistance);
 
-            var rayCastHit = Physics2D.Raycast(rayOrigin, rayDirection, rayDistance, PlatformMask);
+            var rayCastHit = Physics2D.Raycast(rayVector, rayDirection, rayDistance, PlatformMask);
 
             Debug.LogFormat("rayOriginLoop:{0}", rayOrigin);
             Debug.LogFormat("rayCastHit:{0}", rayCastHit.point);
@@ -204,20 +224,21 @@ public class CharacterController2D : MonoBehaviour
         var isGoingUp = deltaMovement.y > 0;
         var rayDistance = Mathf.Abs(deltaMovement.y) + SkinWidth;
         var rayDirection = isGoingUp ? Vector2.up : Vector2.down;
-        var rayOrigin = isGoingUp ? _raycastBottomRight : _raycastBottomLeft;
+        var rayOrigin = isGoingUp ? _raycastTopLeft : _raycastBottomLeft;
         Debug.LogFormat("rayOrigin:{0}", rayOrigin);
         rayOrigin.x += deltaMovement.x;
+
         var standingOnDistance = float.MaxValue;
 
         for (var i = 0; i < TotalVericalRays; i++)
         {
-            var rayVector = new Vector2(rayOrigin.x * (i * _horizontalDistanceBetweenRays),  rayOrigin.y);
+            var rayVector = new Vector2(rayOrigin.x + (i * _horizontalDistanceBetweenRays),  rayOrigin.y);
             Debug.Log(string.Format("i:{0}", i));
-            Debug.Log(string.Format("deltaMovement.x:{0}", deltaMovement.x));
+            Debug.Log(string.Format("deltaMovement.y:{0}", deltaMovement.y));
             Debug.DrawRay(rayVector, rayDirection * rayDistance, Color.red);
             Debug.LogFormat("rayVector:{0}, rayDirection:{1}, rayDistance:{2}", rayVector, rayDirection, rayDistance);
 
-            var rayCastHit = Physics2D.Raycast(rayOrigin, rayDirection, rayDistance, PlatformMask);
+            var rayCastHit = Physics2D.Raycast(rayVector, rayDirection, rayDistance, PlatformMask);
 
             Debug.LogFormat("rayOriginLoop:{0}", rayOrigin);
             Debug.LogFormat("rayCastHit:{0}", rayCastHit.point);
