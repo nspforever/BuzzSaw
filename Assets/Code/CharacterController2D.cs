@@ -58,10 +58,10 @@ public class CharacterController2D : MonoBehaviour
         _localScale = transform.localScale;
         _boxCollider = GetComponent<BoxCollider2D>();
 
-        var colliderWith = _boxCollider.size.x * Mathf.Abs(transform.localScale.x) - (2 * SkinWidth);
+        var colliderWith = _boxCollider.size.x * Mathf.Abs(transform.localScale.x);
         _horizontalDistanceBetweenRays = colliderWith / (TotalVericalRays - 1);
 
-        var colliderHeight = _boxCollider.size.y * Mathf.Abs(transform.localScale.y) - (2 * SkinWidth);
+        var colliderHeight = _boxCollider.size.y * Mathf.Abs(transform.localScale.y);
         _verticalDistanceBetweenRays = colliderHeight / (TotalHorizontalRays - 1);
 
         Debug.Log(string.Format("_verticalDistanceBetweenRays.x:{0}", _verticalDistanceBetweenRays));
@@ -292,12 +292,60 @@ public class CharacterController2D : MonoBehaviour
 
     private bool HandleHorizontalSlope(ref Vector2 deltaMovement, float angle, bool isGoingRight)
     {
-        return false;
+        if (Mathf.RoundToInt(angle) == 90)
+        {
+            return false;
+        }
+
+        if (angle > Parameters.SlopeLimit)
+        {
+            deltaMovement.x = 0;
+            return true;
+        }
+        
+        if (deltaMovement.y > .07f)
+        {
+            return true;
+        }
+
+        deltaMovement.x += isGoingRight ? -SkinWidth : SkinWidth;
+        deltaMovement.y = Mathf.Abs(Mathf.Tan(angle * Mathf.Deg2Rad) * deltaMovement.x);
+        State.IsMovingUpSlope = true;
+        State.IsCollidingBlow = true;
+        return true;
     }
 
-    private bool HandleVerticalSlope(ref Vector2 deltaMovement)
+    private void HandleVerticalSlope(ref Vector2 deltaMovement)
     {
-        return false;
+        var center = (_raycastBottomLeft.x + _raycastBottomRight.x) / 2;
+        var direction = Vector2.down;
+
+        var slopeDistance = SlopeLimitTangant * (_raycastBottomRight.x - center);
+        var slopeRayVector = new Vector2(center, _raycastBottomLeft.y);
+        Debug.DrawRay(slopeRayVector, direction * slopeDistance, Color.yellow);
+
+        var rayCasetHit = Physics2D.Raycast(slopeRayVector, direction, slopeDistance, PlatformMask);
+        if (rayCasetHit.collider == null)
+        {
+            return;
+        }
+
+        var isMovingDownSlope = Mathf.Sign(rayCasetHit.normal.x) == Mathf.Sign(deltaMovement.x);
+        if (!isMovingDownSlope)
+        {
+            return;
+        }
+
+        var angle = Vector2.Angle(rayCasetHit.normal, Vector2.up);
+        if (Mathf.Abs(angle) < 0.0001f)
+        {
+            return;
+        }
+
+        State.IsMovingDownSlope = true;
+        State.SlopeAngel = angle;
+        deltaMovement.y = rayCasetHit.point.y - slopeRayVector.y;
+
     }
 
     public void OnTriggerEnter2D(Collider2D other)
